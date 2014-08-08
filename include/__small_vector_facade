@@ -243,7 +243,7 @@ template<typename Derived, typename T, std::size_t Rank>
     // XXX should try to fully parameterize the rhs
     template<class OtherDerived, class OtherT>
     typename enable_if<
-      __has_operator_minus_assign<OtherT>::value,
+      __has_operator_minus_assign<value_type,OtherT>::value,
       Derived&
     >::type
       operator-=(const __small_vector_facade<OtherDerived,OtherT,Rank>& rhs)
@@ -490,4 +490,3 @@ template<typename Derived, typename Base, typename T, std::size_t Rank>
 
 
 }
-
