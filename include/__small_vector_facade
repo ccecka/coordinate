@@ -179,7 +179,7 @@ template<typename Derived, typename T, std::size_t Rank>
     // multiply by scalar
     template<class OtherT>
     typename enable_if<
-      __has_operator_multiplies_assign<value_type,OtherT>::value,
+      __has_operator_multiplies_assign<value_type&,OtherT>::value,
       Derived&
     >::type
       operator*=(OtherT rhs)
@@ -196,7 +196,7 @@ template<typename Derived, typename T, std::size_t Rank>
     // divide by scalar
     template<class OtherT>
     typename enable_if<
-      __has_operator_divides_assign<value_type,OtherT>::value,
+      __has_operator_divides_assign<value_type&,OtherT>::value,
       Derived&
     >::type
       operator/=(OtherT rhs)
@@ -213,7 +213,7 @@ template<typename Derived, typename T, std::size_t Rank>
     // XXX should try to fully parameterize the rhs
     template<class OtherDerived, class OtherT>
     typename enable_if<
-      __has_operator_plus_assign<value_type,OtherT>::value,
+      __has_operator_plus_assign<value_type&,OtherT>::value,
       Derived&
     >::type
       operator+=(const __small_vector_facade<OtherDerived,OtherT,Rank>& rhs)
@@ -243,7 +243,7 @@ template<typename Derived, typename T, std::size_t Rank>
     // XXX should try to fully parameterize the rhs
     template<class OtherDerived, class OtherT>
     typename enable_if<
-      __has_operator_minus_assign<value_type,OtherT>::value,
+      __has_operator_minus_assign<value_type&,OtherT>::value,
       Derived&
     >::type
       operator-=(const __small_vector_facade<OtherDerived,OtherT,Rank>& rhs)
@@ -273,7 +273,7 @@ template<typename Derived, typename T, std::size_t Rank>
     // XXX should try to fully parameterize the rhs
     template<class OtherDerived, class OtherT>
     typename enable_if<
-      __has_operator_multiplies_assign<value_type,OtherT>::value,
+      __has_operator_multiplies_assign<value_type&,OtherT>::value,
       Derived&
     >::type
       operator*=(const __small_vector_facade<OtherDerived,OtherT,Rank>& rhs)
@@ -303,7 +303,7 @@ template<typename Derived, typename T, std::size_t Rank>
     // XXX should try to fully parameterize the rhs
     template<class OtherDerived, class OtherT>
     typename enable_if<
-      __has_operator_divides_assign<value_type,OtherT>::value,
+      __has_operator_divides_assign<value_type&,OtherT>::value,
       Derived&
     >::type
       operator/=(const __small_vector_facade<OtherDerived,OtherT,Rank>& rhs)

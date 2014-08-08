@@ -1,398 +1,223 @@
 #pragma once
 
-#include <type_traits>
 #include <utility>
 
-namespace std
-{
-namespace __operator_traits_namespace
-{
+namespace std {
+
+/** C++14-like <functional> extensions */
+namespace fn {
+
+/***********/
+/** Unary **/
+/***********/
+
+#define LEFT_UNARY_OP(NAME,OP)                    \
+  struct NAME {                                   \
+    template <class T>                            \
+    constexpr auto operator()(T&& arg) const      \
+        -> decltype( OP std::forward<T>(arg)) {   \
+      return OP std::forward<T>(arg);             \
+    }                                             \
+  }
+#define RIGHT_UNARY_OP(NAME,OP)                   \
+  struct NAME {                                   \
+    template <class T>                            \
+    constexpr auto operator()(T&& arg) const      \
+        -> decltype(std::forward<T>(arg) OP ) {   \
+      return std::forward<T>(arg) OP ;            \
+    }                                             \
+  }
+
+LEFT_UNARY_OP(unary_plus,       +);
+LEFT_UNARY_OP(unary_minus,      -);
+LEFT_UNARY_OP(bit_not,          ~);
+LEFT_UNARY_OP(logical_not,      !);
+LEFT_UNARY_OP(dereference,      *);
+LEFT_UNARY_OP(pre_increment,   ++);
+LEFT_UNARY_OP(pre_decrement,   --);
+
+RIGHT_UNARY_OP(post_increment, ++);
+RIGHT_UNARY_OP(post_decrement, --);
+
+#undef LEFT_UNARY_OP
+#undef RIGHT_UNARY_OP
+
+/************/
+/** Binary **/
+/************/
+
+#define BINARY_OP(NAME,OP)                                           \
+  struct NAME {                                                      \
+    template <class T, class U>                                      \
+    constexpr auto operator()(T&& lhs, U&& rhs) const                \
+        -> decltype(std::forward<T>(lhs) OP std::forward<U>(rhs)) {  \
+      return std::forward<T>(lhs) OP std::forward<U>(rhs);           \
+    }                                                                \
+  }
+
+BINARY_OP(plus,                 +);
+BINARY_OP(minus,                -);
+BINARY_OP(multiplies,           *);
+BINARY_OP(divides,              /);
+BINARY_OP(modulus,              %);
+BINARY_OP(bit_and,              &);
+BINARY_OP(bit_or,               |);
+BINARY_OP(bit_xor,              ^);
+BINARY_OP(left_shift,          <<);
+BINARY_OP(right_shift,         >>);
+
+BINARY_OP(plus_assign,         +=);
+BINARY_OP(minus_assign,        -=);
+BINARY_OP(multiplies_assign,   *=);
+BINARY_OP(divides_assign,      /=);
+BINARY_OP(modulus_assign,      %=);
+BINARY_OP(bit_and_assign,      &=);
+BINARY_OP(bit_or_assign,       |=);
+BINARY_OP(bit_xor_assign,      ^=);
+BINARY_OP(left_shift_assign,  <<=);
+BINARY_OP(right_shift_assign, >>=);
+
+BINARY_OP(logical_and,         &&);
+BINARY_OP(logical_or,          ||);
+
+BINARY_OP(equal_to,            ==);
+BINARY_OP(not_equal_to,        !=);
+BINARY_OP(greater,              >);
+BINARY_OP(less,                 <);
+BINARY_OP(greater_equal,       >=);
+BINARY_OP(less_equal,          <=);
+
+#undef BINARY_OP
+
+} // end namespace fn
 
 
-template<typename T1, typename T2> struct is_different : std::true_type {};
+namespace sfinae {
 
+template <class F, class... Args>
+struct invokeable {
+  template <class U = F>
+  static auto test(int)
+      -> decltype(std::declval<U>()(std::declval<Args>()...),
+                  void(), std::true_type());
 
-template<typename T1> struct is_different<T1,T1> : std::false_type {};
+  static auto test(...) -> std::false_type;
 
+  using type = decltype(test(0));
+  static constexpr bool value = type::value;
+};
 
-struct any
-{
-  template<typename T> any(T) {}
+template <bool Callable, class ReturnType, class F, class... Args>
+struct check_return
+    : std::is_convertible<decltype(std::declval<F>()(std::declval<Args>()...)),
+                          ReturnType>::type {
+};
+
+template <class ReturnType, class F, class... Args>
+struct check_return<false, ReturnType, F, Args...>
+    : std::false_type {
 };
 
 
-struct ignore {};
+struct __ignore {};
 
+template <class ReturnType, class F, class... Args>
+struct check_function
+    : check_return<invokeable<F, Args...>::value, ReturnType, F, Args...>::type {
+};
 
-struct no {};
-
-
-no operator+(any, any);
-no operator+=(any, any);
-
-no operator-(any, any);
-no operator-=(any, any);
-
-no operator*(any, any);
-no operator*=(any, any);
-
-no operator/(any, any);
-no operator/=(any, any);
-
-no operator<(any, any);
-no operator<=(any, any);
-
-no operator>(any, any);
-no operator>=(any, any);
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_plus
-  : is_different<
-      decltype(std::declval<T1>() + std::declval<T2>()),
-      no
-    >
-{
+template <class F, class... Args>
+struct check_function<__ignore, F, Args...>
+    : invokeable<F, Args...>::type {
 };
 
 
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_plus_assign
-  : is_different<
-      decltype(std::declval<T1&>() += std::declval<T2>()),
-      no
-    >
-{
-};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_minus
-  : is_different<
-      decltype(std::declval<T1>() - std::declval<T2>()),
-      no
-    >
-{
-};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_minus_assign
-  : is_different<
-      decltype(std::declval<T1&>() -= std::declval<T2>()),
-      no
-    >
-{
-};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_multiplies
-  : is_different<
-      decltype(std::declval<T1>() * std::declval<T2>()),
-      no
-    >
-{
-};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_multiplies_assign
-  : is_different<
-      decltype(std::declval<T1&>() *= std::declval<T2>()),
-      no
-    >
-{
-};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_divides
-  : is_different<
-      decltype(std::declval<T1>() / std::declval<T2>()),
-      no
-    >
-{
-};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_divides_assign
-  : is_different<
-      decltype(std::declval<T1&>() /= std::declval<T2>()),
-      no
-    >
-{
-};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_less
-  : is_different<
-      decltype(std::declval<T1>() < std::declval<T2>()),
-      no
-    >
-{};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_less_equal
-  : is_different<
-      decltype(std::declval<T1>() <= std::declval<T2>()),
-      no
-    >
-{};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_greater
-  : is_different<
-      decltype(std::declval<T1>() > std::declval<T2>()),
-      no
-    >
-{};
-
-
-template<typename T1, typename T2 = T1, typename Result = ignore>
-struct has_operator_greater_equal
-  : is_different<
-      decltype(std::declval<T1>() >= std::declval<T2>()),
-      no
-    >
-{};
-
-
-template<typename, typename, typename Enable = void> struct operator_plus_result {};
-
-
-template<typename T1, typename T2>
-struct operator_plus_result<T1, T2, typename std::enable_if<has_operator_plus<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() + std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_plus_assign_result {};
-
-
-template<typename T1, typename T2>
-struct operator_plus_assign_result<T1,T2, typename std::enable_if<has_operator_plus_assign<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() += std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_minus_result {};
-
-
-template<typename T1, typename T2>
-struct operator_minus_result<T1,T2, typename std::enable_if<has_operator_minus<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() - std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_minus_assign_result {};
-
-
-template<typename T1, typename T2>
-struct operator_minus_assign_result<T1, T2, typename std::enable_if<has_operator_minus_assign<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() -= std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_multiplies_result {};
-
-
-template<typename T1, typename T2>
-struct operator_multiplies_result<T1, T2, typename std::enable_if<has_operator_multiplies<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() - std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_multiplies_assign_result {};
-
-
-template<typename T1, typename T2>
-struct operator_multiplies_assign_result<T1,T2, typename std::enable_if<has_operator_multiplies_assign<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() -= std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_divides_result {};
-
-
-template<typename T1, typename T2>
-struct operator_divides_result<T1,T2, typename std::enable_if<has_operator_divides<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() - std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_divides_assign_result {};
-
-
-template<typename T1, typename T2>
-struct operator_divides_assign_result<T1, T2, typename std::enable_if<has_operator_divides_assign<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() -= std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_less_result {};
-
-
-template<typename T1, typename T2>
-struct operator_less_result<T1,T2, typename std::enable_if<has_operator_less<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() < std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_less_equal_result {};
-
-
-template<typename T1, typename T2>
-struct operator_less_equal_result<T1,T2, typename std::enable_if<has_operator_less_equal<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() <= std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_greater_result {};
-
-
-template<typename T1, typename T2>
-struct operator_greater_result<T1,T2, typename std::enable_if<has_operator_greater<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() > std::declval<T2>());
-};
-
-
-template<typename, typename, typename Enable = void> struct operator_greater_equal_result {};
-
-
-template<typename T1, typename T2>
-struct operator_greater_equal_result<T1,T2, typename std::enable_if<has_operator_greater_equal<T1,T2>::value>::type>
-{
-  using type = decltype(std::declval<T1>() >= std::declval<T2>());
-};
-
-
-}
-
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_plus : __operator_traits_namespace::has_operator_plus<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_plus_assign : __operator_traits_namespace::has_operator_plus_assign<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_minus : __operator_traits_namespace::has_operator_minus<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_minus_assign : __operator_traits_namespace::has_operator_minus_assign<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_multiplies : __operator_traits_namespace::has_operator_multiplies<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_multiplies_assign : __operator_traits_namespace::has_operator_multiplies_assign<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_divides : __operator_traits_namespace::has_operator_divides<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_divides_assign : __operator_traits_namespace::has_operator_divides_assign<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1>
+} // end namespace sfinae
+
+
+
+#define BINARY_TRAIT(NAME, OP)                                          \
+  template <class T1, class T2 = T1, class Result = sfinae::__ignore>   \
+  struct __has_operator_##NAME : sfinae::check_function<Result,fn::NAME,T1,T2>::type{}; \
+                                                                        \
+  template <class T1, class T2 = T1>                                    \
+  using __operator_##NAME##_result = decltype(std::declval<T1>() OP std::declval<T2>())
+
+#define L_UNARY_TRAIT(NAME, OP)                                         \
+  template <class T1, class Result = sfinae::__ignore>                  \
+  struct __has_operator_##NAME : sfinae::check_function<Result,fn::NAME,T1>::type{}; \
+                                                                        \
+  template <class T1>                                                   \
+  using __operator_##NAME##_result = decltype(OP std::declval<T1>())
+
+#define R_UNARY_TRAIT(NAME, OP)                                         \
+  template <class T1, class Result = sfinae::__ignore>                  \
+  struct __has_operator_##NAME : sfinae::check_function<Result,fn::NAME,T1>::type{}; \
+                                                                        \
+  template <class T1>                                                   \
+  using __operator_##NAME##_result = decltype(std::declval<T1>() OP)
+
+
+
+BINARY_TRAIT(plus,                 +);
+BINARY_TRAIT(minus,                -);
+BINARY_TRAIT(multiplies,           *);
+BINARY_TRAIT(divides,              /);
+BINARY_TRAIT(modulus,              %);
+BINARY_TRAIT(bit_and,              &);
+BINARY_TRAIT(bit_or,               |);
+BINARY_TRAIT(bit_xor,              ^);
+BINARY_TRAIT(left_shift,          <<);
+BINARY_TRAIT(right_shift,         >>);
+
+BINARY_TRAIT(plus_assign,         +=);
+BINARY_TRAIT(minus_assign,        -=);
+BINARY_TRAIT(multiplies_assign,   *=);
+BINARY_TRAIT(divides_assign,      /=);
+BINARY_TRAIT(modulus_assign,      %=);
+BINARY_TRAIT(bit_and_assign,      &=);
+BINARY_TRAIT(bit_or_assign,       |=);
+BINARY_TRAIT(bit_xor_assign,      ^=);
+BINARY_TRAIT(left_shift_assign,  <<=);
+BINARY_TRAIT(right_shift_assign, >>=);
+
+BINARY_TRAIT(logical_and,         &&);
+BINARY_TRAIT(logical_or,          ||);
+
+BINARY_TRAIT(equal_to,            ==);
+BINARY_TRAIT(not_equal_to,        !=);
+BINARY_TRAIT(greater,              >);
+BINARY_TRAIT(less,                 <);
+BINARY_TRAIT(greater_equal,       >=);
+BINARY_TRAIT(less_equal,          <=);
+
+L_UNARY_TRAIT(unary_plus,          +);
+L_UNARY_TRAIT(unary_minus,         -);
+L_UNARY_TRAIT(bit_not,             ~);
+L_UNARY_TRAIT(logical_not,         !);
+L_UNARY_TRAIT(dereference,         *);
+L_UNARY_TRAIT(pre_increment,      ++);
+L_UNARY_TRAIT(pre_decrement,      --);
+
+R_UNARY_TRAIT(post_increment,     ++);
+R_UNARY_TRAIT(post_decrement,     --);
+
+#undef BINARY_TRAIT
+#undef UNARY_TRAIT
+
+
+// Do not like this trait...
+template <class T1, class T2 = T1>
 struct __has_arithmetic_operators : std::integral_constant<
   bool,
-  __has_operator_plus<T1,T2,T1&>::value &&
-  __has_operator_plus_assign<T1,T2,T1&>::value &&
-  __has_operator_minus<T1,T2,T1&>::value &&
-  __has_operator_minus_assign<T1,T2,T1&>::value &&
-  __has_operator_multiplies<T1,T2,T1&>::value &&
-  __has_operator_multiplies_assign<T1,T2,T1&>::value &&
-  __has_operator_divides<T1,T2,T1&>::value &&
-  __has_operator_divides_assign<T1,T2,T1&>::value
->
-{};
+  __has_operator_plus<T1,T2>::value &&
+  __has_operator_plus_assign<T1&,T2>::value &&
+  __has_operator_minus<T1,T2>::value &&
+  __has_operator_minus_assign<T1&,T2>::value &&
+  __has_operator_multiplies<T1,T2>::value &&
+  __has_operator_multiplies_assign<T1&,T2>::value &&
+  __has_operator_divides<T1&,T2>::value &&
+  __has_operator_divides_assign<T1&,T2>::value
+> {};
 
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_less : __operator_traits_namespace::has_operator_divides_assign<T1,T2,Result> {};
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_less_equal : __operator_traits_namespace::has_operator_divides_assign<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_greater : __operator_traits_namespace::has_operator_divides_assign<T1,T2,Result> {};
-
-template<typename T1, typename T2 = T1, typename Result = __operator_traits_namespace::ignore>
-struct __has_operator_greater_equal : __operator_traits_namespace::has_operator_divides_assign<T1,T2,Result> {};
-
-
-template<typename T1, typename T2 = T1>
-struct __operator_plus_result : __operator_traits_namespace::operator_plus_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = typename std::remove_reference<T1>::type>
-struct __operator_plus_assign_result : __operator_traits_namespace::operator_plus_assign_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = T1>
-struct __operator_minus_result : __operator_traits_namespace::operator_minus_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = typename std::remove_reference<T1>::type>
-struct __operator_minus_assign_result : __operator_traits_namespace::operator_minus_assign_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = T1>
-struct __operator_multiplies_result : __operator_traits_namespace::operator_multiplies_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = typename std::remove_reference<T1>::type>
-struct __operator_multiplies_assign_result : __operator_traits_namespace::operator_multiplies_assign_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = T1>
-struct __operator_divides_result : __operator_traits_namespace::operator_divides_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = typename std::remove_reference<T1>::type>
-struct __operator_divides_assign_result : __operator_traits_namespace::operator_divides_assign_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = T1>
-struct __operator_less_result : __operator_traits_namespace::operator_less_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = T1>
-struct __operator_less_equal_result : __operator_traits_namespace::operator_less_equal_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = T1>
-struct __operator_greater_result : __operator_traits_namespace::operator_greater_result<T1,T2> {};
-
-
-template<typename T1, typename T2 = T1>
-struct __operator_greater_equal_result : __operator_traits_namespace::operator_greater_equal_result<T1,T2> {};
-
-
-} // end std
-
+} // end namespace std
